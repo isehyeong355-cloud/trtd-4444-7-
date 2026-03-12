@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>TRTD-4444 Survival System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+        :root {
+            --trtd-red: #ff3e3e;
+            --trtd-dark: #0a0a0a;
+            --trtd-card: #161618;
+        }
+
+        body {
+            background-color: var(--trtd-dark);
+            color: #e4e4e7;
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .glass-card {
+            background: var(--trtd-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1.25rem;
+        }
+
+        .tab-active {
+            color: var(--trtd-red);
+            position: relative;
+        }
+        .tab-active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 3px;
+            background-color: var(--trtd-red);
+            border-radius: 2px;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .status-dot-active { animation: pulse-red 2s infinite; }
+
+        .admin-gradient {
+            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            border-bottom: 2px solid #ff3e3e;
+        }
+
+        /* Map Styles */
+        .map-grid-item {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 9px;
+            border-radius: 8px;
+            padding: 2px;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .zone-admin { background: #1e1b4b; border-color: #4338ca; color: #818cf8; }
+        .zone-utility { background: #064e3b; border-color: #059669; color: #34d399; }
+        .zone-military { background: #450a0a; border-color: #991b1b; color: #f87171; }
+        .zone-research { background: #3b0764; border-color: #7e22ce; color: #c084fc; }
+        .zone-storage { background: #171717; border-color: #404040; color: #a3a3a3; }
+        .zone-living { background: #27272a; border-color: #52525b; color: #d4d4d8; }
+        .zone-molar { background: #000; border-color: #ff3e3e; color: #ff3e3e; box-shadow: inset 0 0 8px rgba(255, 62, 62, 0.3); }
+
+        /* Smooth scroll for map */
+        #main-content { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-full max-w-sm space-y-10">
+            <div class="space-y-2">
+                <h1 class="text-5xl font-black italic text-red-600 font-orbitron tracking-tighter">TRTD-4444</h1>
+                <p class="text-zinc-600 text-[10px] font-bold tracking-[0.4em] uppercase">Survival Management System</p>
+            </div>
+
+            <div class="space-y-4">
+                <input id="user-nickname" type="text" placeholder="탑승자 닉네임" class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-white text-center outline-none focus:border-red-600 transition-all font-bold" autofocus>
+
+                <div id="mc-input-area" class="hidden space-y-3">
+                    <input id="mc-password" type="password" placeholder="MASTER CODE" class="w-full bg-zinc-900 border border-red-900/30 rounded-2xl p-5 text-red-500 text-center outline-none focus:border-red-600 transition-all font-orbitron">
+                    <button onclick="enterTrain(true)" class="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-sm uppercase shadow-lg shadow-red-900/20">MC AUTHORIZE</button>
+                    <button onclick="hideMCLogin()" class="w-full py-2 text-zinc-600 text-[10px] font-bold">BACK TO PASSENGER</button>
+                </div>
+
+                <div id="normal-input-area" class="space-y-3">
+                    <button onclick="enterTrain(false)" class="w-full py-5 bg-white text-black rounded-2xl font-black text-sm uppercase hover:bg-zinc-200 transition-all">ENTER TRAIN</button>
+                    <button onclick="showMCLogin()" class="w-full py-2 text-red-900/40 text-[10px] font-bold uppercase tracking-widest">Master Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main System UI -->
+    <div id="system-ui" class="hidden flex flex-col h-full bg-black overflow-hidden">
+
+        <!-- MC Top Bar -->
+        <div id="mc-top-bar" class="hidden admin-gradient px-5 py-3 flex justify-between items-center z-[100]">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-red-600 rounded flex items-center justify-center text-white">
+                    <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-red-500 leading-none uppercase">MC Control Active</p>
+                    <p class="text-[8px] text-zinc-500 font-bold uppercase tracking-tighter">System Override Mode</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openMCMenu('notice')" class="px-3 py-2 bg-zinc-900 rounded-lg text-[10px] font-black text-white hover:bg-red-900 transition-all">공지/이벤트</button>
+                <button onclick="openMCMenu('mission')" class="px-3 py-2 bg-zinc-900 rounded-lg text-[10px] font-black text-white hover:bg-red-900 transition-all">미션생성</button>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="p-5 flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-black italic text-red-600 font-orbitron leading-none">TRTD-4444</h1>
+                <div class="flex items-center gap-1.5 mt-2">
+                    <div class="w-1.5 h-1.5 rounded-full bg-red-600 status-dot-active"></div>
+                    <span id="auth-status" class="text-[9px] font-bold text-zinc-500 tracking-wider uppercase tracking-[0.2em]">Authorized</span>
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+                <span class="text-[10px] text-zinc-500 font-orbitron" id="system-time">--:--:--</span>
+                <span class="text-[8px] text-red-900/60 font-black tracking-widest uppercase">Protocol 4.4</span>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="flex justify-around px-2 border-b border-zinc-900">
+            <button onclick="switchTab('setting')" id="tab-setting" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all tab-active">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">설정</span>
+            </button>
+            <button onclick="switchTab('character')" id="tab-character" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all text-zinc-600">
+                <i data-lucide="user-round" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">인물</span>
+            </button>
+            <button onclick="switchTab('map')" id="tab-map" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all text-zinc-600">
+                <i data-lucide="map" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">지도</span>
+            </button>
+            <button onclick="switchTab('mission')" id="tab-mission" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all text-zinc-600">
+                <i data-lucide="target" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">미션</span>
+            </button>
+            <button onclick="switchTab('comm')" id="tab-comm" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all text-zinc-600">
+                <i data-lucide="message-circle" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">채팅</span>
+            </button>
+            <button onclick="switchTab('passengers')" id="tab-passengers" class="tab-btn px-2 py-5 flex flex-col items-center gap-1 transition-all text-zinc-600">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span class="text-[9px] font-bold">탑승</span>
+            </button>
+        </nav>
+
+        <!-- Content Area -->
+        <main id="main-content" class="flex-1 overflow-y-auto p-5 no-scrollbar bg-[#050505]">
+            <!-- Dynamic Content -->
+        </main>
+    </div>
+
+    <!-- MC Modal -->
+    <div id="mc-modal" class="fixed inset-0 z-[600] bg-black/95 backdrop-blur-md hidden flex flex-col p-6 overflow-y-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h2 id="mc-modal-title" class="text-xl font-black text-red-600 italic font-orbitron uppercase">MC SYSTEM MENU</h2>
+            <button onclick="closeMCMenu()" class="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center text-white"><i data-lucide="x"></i></button>
+        </div>
+        <div id="mc-modal-content" class="space-y-6 pb-20"></div>
+    </div>
+
+    <script>
+        const MASTER_CODE = "NBVX5435";
+
+        let state = {
+            currentTab: 'setting',
+            isMC: false,
+            currentUser: null,
+            messages: [],
+            activeMissions: [],
+            events: []
+        };
+
+        const CHARACTERS = [
+            { name: "김진형(남)", role: "기관사", age: 37, group: "운영진", tendency: "선", personality: "책임자", power: "C", weapon: "설득 및 중재", items: "확성기", desc: "이 열차의 총책임자로써 여러 권리 및 이 열차에 강한 권능을 가지고 있습니다. 하지만..그가 말하는 책임자 그저 평범한 시민들까지 챙길지는..", special: "이 열차의 책임자" },
+            { name: "유진성(남)", role: "검술달인", age: 19, group: "탐색대", tendency: "선", personality: "묵묵함", power: "A(S~SS)", weapon: "검술", items: "검", ability: "바람의 검", desc: "과거 검술가문의 대가이자 면역자. 누명을 쓰고 선수 자격 박탈 후 세상이 멸망했습니다. 그의 검은 이제 좀비를 베어냅니다.", special: "검술의 대가" },
+            { name: "이예현(남)", role: "요리사", age: 29, group: "운영진", tendency: "선", personality: "자애로움", power: "B", weapon: "없음", items: "여러 요리 가능한 물품", desc: "요리사 우승자 출신 유명 셰프. 열차 주방칸의 총책임자이며 식자재를 가져다줄 시 체력 회복이나 특별한 일이 생깁니다.", special: "유명 셰프 요리사" },
+            { name: "마석형(남)", role: "예비 아빠", age: 32, group: "탐색대", tendency: "선", personality: "거칠다", power: "SS", weapon: "주먹", items: "라이터, 담배, 글러브", ability: "신체강화", desc: "전직 선수이자 조폭 출신 면역자. 아내를 만나 개과천선했으며 세계관 최강의 근력으로 좀비를 죽입니다.", special: "세계관 최강 근력" },
+            { name: "하루여(여)", role: "인플루언서", age: 22, group: "무소속", tendency: "혼돈", personality: "너무나 착함", power: "D", weapon: "없음", items: "핸드폰, 화장품", desc: "전직 아이돌이자 버튜버. 너무 착해서 가끔 말썽을 부리는 '머리가 꽃밭'인 스타일입니다.", special: "유명 아이돌 및 버튜버" },
+            { name: "이로미(여)", role: "연구자", age: 26, group: "운영진", tendency: "선", personality: "냉철함", power: "C", weapon: "화학 약품 제조", items: "과학 물품", desc: "좀비 사태의 다이아 바이오 연구자 출신 천재. 열차의 브레인이며 아이템 제조가 가능합니다.", special: "다이아 바이오 연구자" },
+            { name: "아연우(여)", role: "의사", age: 24, group: "운영진", tendency: "선", personality: "착함", power: "D", weapon: "주사기(투척) 및 아군 회복", items: "의료약품", ability: "새크리파이스", desc: "의료실 총책임자이자 면역자. 엘리트 의사로서 부상당한 사람들을 치료하는 핵심 역할을 합니다.", special: "의료실 총책임자" },
+            { name: "창준섭(남)", role: "싸이코패스", age: 25, group: "어금니", tendency: "악", personality: "절대악", power: "S(SS)", weapon: "나이프 파이팅", items: "나이프(2개), 기름통", ability: "흑안개", desc: "살인에 희열을 느끼는 잭 더 리퍼의 후예. 어금니 5간부 중 서열 4위 '사신'이며 면역자입니다.", special: "싸이코패스 절대악" },
+            { name: "김민우(남)", role: "엘리트 요원", age: 29, group: "탐색대", tendency: "중립", personality: "철저함", power: "SS", weapon: "생존무술 및 총술", items: "M16, 탄환 30발", ability: "ERROR", desc: "특수부대 출신 면역자. 탐색대의 대장으로 실전 무술과 총술에 능하며 압도적 전투력을 가졌습니다.", special: "특수부대 엘리트 요원" },
+            { name: "이한준(남)", role: "방화범", age: 17, group: "탐색대", tendency: "선", personality: "명쾌함", power: "S", weapon: "주먹과 불", items: "라이터", ability: "불사조", desc: "과거의 실수를 딛고 동료를 위해 웃는 분위기 메이커. 탐색대의 선봉이자 면역자입니다.", special: "과거 학교 방화 전적" },
+            { name: "우현진(남)", role: "보스", age: 34, group: "어금니", tendency: "악", personality: "생존악", power: "SS", weapon: "장검술", items: "의문의 약", ability: "중력 제어", desc: "어금니의 보스 '비스트'. 생존을 위해 악이 된 자이며 압도적 무력과 치밀함을 겸비한 면역자입니다.", special: "어금니 리더 (서열 1위)" },
+            { name: "호반연(남)", role: "웃는 남자", age: 24, group: "어금니", tendency: "악/혼돈", personality: "수상함", power: "S", weapon: "선동", items: "강철실", ability: "환각", desc: "어금니의 서열 3위 '로키'. 실눈의 수상한 남자이며 이로미와 관계가 있어 보입니다. 면역자입니다.", special: "실눈의 수상한 남자" },
+            { name: "광예선(여)", role: "광녀", age: 19, group: "어금니", tendency: "악", personality: "전투광", power: "S", weapon: "대낫", items: "대낫", ability: "혈계강화", desc: "어금니 서열 5위 '피의 광녀'. 전투를 위해 죽음도 불사하는 전직 부잣집 아가씨이자 면역자입니다.", special: "전투광 대낫 사용자" },
+            { name: "금강혁(남)", role: "낭만주의자", age: 22, group: "어금니", tendency: "혼돈", personality: "낭만주의", power: "SS", weapon: "주먹", items: "안경", ability: "공허", desc: "어금니 서열 2위 '보이드'. 도파민의 노예이며 재미를 위해서라면 아군도 공격하는 면역자입니다.", special: "낭만주의 보이드" }
+        ];
+
+        function updateTime() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('system-time').innerText = `${h}:${m}:${s}`;
+        }
+        // initial time and interval
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        function showMCLogin() {
+            document.getElementById('normal-input-area').classList.add('hidden');
+            document.getElementById('mc-input-area').classList.remove('hidden');
+        }
+
+        function hideMCLogin() {
+            document.getElementById('normal-input-area').classList.remove('hidden');
+            document.getElementById('mc-input-area').classList.add('hidden');
+        }
+
+        function enterTrain(isMCAttempt) {
+            const nickname = document.getElementById('user-nickname').value.trim();
+            if (!nickname) return;
+            if (isMCAttempt) {
+                if (document.getElementById('mc-password').value === MASTER_CODE) {
+                    state.isMC = true;
+                    state.currentUser = `[MC] ${nickname}`;
+                    document.getElementById('mc-top-bar').classList.remove('hidden');
+                    document.getElementById('auth-status').innerText = "ADMIN AUTHORIZED";
+                } else { alert("MASTER CODE ERROR"); return; }
+            } else { state.currentUser = nickname; }
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('system-ui').classList.remove('hidden');
+            state.messages.push({ sender: "System", text: `${state.currentUser}님이 시스템에 접속했습니다.`, type: 'system' });
+            render();
+        }
+
+        // allow Enter key to submit login
+        document.addEventListener('keydown', (e) => {
+            const loginVisible = !document.getElementById('login-screen').classList.contains('hidden');
+            if (loginVisible && e.key === 'Enter') {
+                // If MC input visible, try MC auth; otherwise normal entry
+                const mcVisible = !document.getElementById('mc-input-area').classList.contains('hidden');
+                enterTrain(mcVisible);
+            }
+            // If chat input focused and Enter pressed, send message
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput && document.activeElement === chatInput && e.key === 'Enter') {
+                e.preventDefault();
+                sendMsg();
+            }
+        });
+
+        function switchTab(tabId) {
+            state.currentTab = tabId;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-zinc-600');
+            });
+            document.getElementById(`tab-${tabId}`).classList.add('tab-active');
+            document.getElementById(`tab-${tabId}`).classList.remove('text-zinc-600');
+            render();
+        }
+
+        function render() {
+            const container = document.getElementById('main-content');
+            container.innerHTML = '';
+            switch(state.currentTab) {
+                case 'setting': renderSetting(container); break;
+                case 'character': renderCharacters(container); break;
+                case 'map': renderMap(container); break;
+                case 'mission': renderMission(container); break;
+                case 'comm': renderComm(container); break;
+                case 'passengers': renderPassengers(container); break;
+            }
+            lucide.createIcons();
+        }
+
+        function renderSetting(container) {
+            const SETTINGS_DATA = [
+                { title: "면역자", icon: "zap", color: "text-blue-500", content: "면역자들은 좀비 바이러스에 내성이 있습니다. 일반인은 근처만 가도 감염되지만, 면역자들은 직접 물려야 감염되며 각성 시 고유 초능력을 보유합니다." },
+                { title: "탐색대", icon: "shield", color: "text-green-500", content: "식자재 및 물자를 조달하는 면역자 중심의 무력 집단입니다." },
+                { title: "어금니", icon: "skull", color: "text-red-600", content: "열차 후반 구역을 점령한 거대 범죄 조직으로 사회의 악의 축입니다." },
+                { title: "좀비", icon: "info", color: "text-zinc-500", content: "이성을 잃고 공격성만 남은 변이체들입니다. 다양한 형태가 존재합니다." }
+            ];
+            container.innerHTML = `<div class="space-y-4">` + SETTINGS_DATA.map(s => `
+                <div class="glass-card p-6 border-l-4 ${s.color.replace('text-', 'border-')}">
+                    <div class="flex items-center gap-2 mb-3"><i data-lucide="${s.icon}" class="w-4 h-4 ${s.color}"></i><h2 class="text-sm font-black ${s.color} uppercase italic font-orbitron">${s.title}</h2></div>
+                    <p class="text-xs text-zinc-400 leading-relaxed font-medium">${s.content}</p>
+                </div>`).join('') + `</div>`;
+        }
+
+        function renderCharacters(container) {
+            let html = `<div class="space-y-6">`;
+            ["운영진", "탐색대", "어금니", "무소속"].forEach(group => {
+                const groupChars = CHARACTERS.filter(c => c.group === group);
+                if (groupChars.length > 0) {
+                    html += `<h3 class="text-[10px] font-black text-zinc-600 uppercase tracking-widest px-1 mt-6">${group}</h3>`;
+                    groupChars.forEach(c => {
+                        html += `
+                        <div class="glass-card p-6 mb-4 border-zinc-800">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="text-xl font-black text-white">${c.name}</h3>
+                                    <p class="text-[10px] text-red-500 font-bold mt-1">${c.special}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="font-orbitron text-[9px] font-black text-zinc-600 block">LV. ${c.power}</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[10px] text-zinc-400 italic mb-4">
+                                <div class="bg-black/40 p-2 rounded">나이: ${c.age} / 성향: ${c.tendency}</div>
+                                <div class="bg-black/40 p-2 rounded">능력: ${c.ability || 'N/A'}</div>
+                                <div class="bg-black/40 p-2 rounded truncate">무기: ${c.weapon}</div>
+                                <div class="bg-black/40 p-2 rounded truncate">소지품: ${c.items}</div>
+                            </div>
+                            <p class="text-[11px] text-zinc-500 italic">"${c.desc}"</p>
+                        </div>`;
+                    });
+                }
+            });
+            container.innerHTML = html + `</div>`;
+        }
+
+        function renderMap(container) {
+            const specials = [
+                { name: "기관실", c: 1, t: "zone-admin", i: "settings" },
+                { name: "VVP실", c: 3, t: "zone-admin", i: "cpu" },
+                { name: "훈련실", c: 3, t: "zone-military", i: "sword" },
+                { name: "주방", c: 3, t: "zone-utility", i: "utensils" },
+                { name: "창고", c: 3, t: "zone-storage", i: "box" },
+                { name: "무기고", c: 3, t: "zone-military", i: "shield-alert" },
+                { name: "연구실", c: 3, t: "zone-research", i: "flask-conical" },
+                { name: "상점가", c: 3, t: "zone-utility", i: "shopping-cart" },
+                { name: "재배실", c: 3, t: "zone-utility", i: "leaf" },
+                { name: "재판실", c: 3, t: "zone-research", i: "scale" },
+                { name: "탐색대", c: 3, t: "zone-military", i: "flag" }
+            ];
+            let html = `<div class="space-y-6 pb-20">
+                <div class="grid grid-cols-4 gap-2">`;
+            specials.forEach(z => { for(let i=1; i<=z.c; i++) html += `<div class="map-grid-item ${z.t}"><i data-lucide="${z.i}" class="w-3 h-3 mb-1"></i><span class="font-black leading-none">${z.name}</span><span class="text-[7px] mt-1 opacity-50">${i}</span></div>`; });
+            html += `</div><div class="grid grid-cols-5 gap-1.5 mt-8">`;
+            for(let i=1; i<=50; i++) html += `<div class="map-grid-item ${i>30 ? 'zone-molar' : 'zone-living'}"><span class="font-orbitron font-black text-[9px]">${i}</span><span class="text-[6px] opacity-50 uppercase">${i>30 ? 'Danger' : 'Safe'}</span></div>`;
+            container.innerHTML = html + `</div></div>`;
+        }
+
+        function renderMission(container) {
+            let html = `<div class="space-y-6">`;
+            if(state.events.length > 0) state.events.forEach(ev => html += `<div class="glass-card p-6 border border-red-900 bg-red-950/10"><h4 class="text-lg font-black text-white mb-2 underline decoration-red-600">${ev.title}</h4><p class="text-xs text-zinc-300 mb-4">${ev.content}</p><p class="text-[11px] text-yellow-500 font-bold">보상: ${ev.firstReward}</p></div>`);
+            if(state.activeMissions.length === 0) html += `<p class="text-center py-10 text-[10px] text-zinc-800 font-bold">등록된 미션 없음</p>`;
+            else state.activeMissions.forEach(m => html += `<div class="glass-card p-6 border-l-4 border-zinc-700"><h4 class="font-black text-white mb-1">${m.title}</h4><p class="text-xs text-zinc-400 mb-4">${m.content}</p><p class="text-[10px] font-bold text-red-500">보상: ${m.reward}</p></div>`);
+            container.innerHTML = html + `</div>`;
+        }
+
+        function renderComm(container) {
+            container.innerHTML = `<div class="flex flex-col h-[calc(100vh-250px)] glass-card overflow-hidden"><div id="chat-box" class="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">${state.messages.map(m => `<div class="flex flex-col ${m.sender === state.currentUser ? 'items-end' : 'items-start'}"><span class="text-[9px] font-black text-zinc-700 mb-1">${m.sender}</span><div class="${m.sender === state.currentUser ? 'bg-red-600 text-white' : (m.type === 'notice' ? 'bg-zinc-800 border-2 border-red-600 w-full text-center py-4 text-red-500 font-black' : 'bg-zinc-900 text-zinc-300')} px-4 py-2 rounded-2xl text-xs max-w-[90%]">${m.text.split('\n').join('<br>')}</div></div>`).join('')}</div><div class="p-4 border-t border-zinc-900 flex gap-2"><input id="chat-input" type="text" placeholder="메시지 입력..." class="flex-1 bg-black border border-zinc-800 rounded-full px-5 text-sm outline-none focus:border-red-600"><button onclick="sendMsg()" class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white"><i data-lucide="send-horizontal" class="w-4 h-4"></i></button></div></div>`;
+            const box = document.getElementById('chat-box'); if (box) box.scrollTop = box.scrollHeight;
+        }
+
+        function renderPassengers(container) {
+            container.innerHTML = `<div class="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800 flex justify-between items-center"><span class="text-sm font-black ${state.isMC ? 'text-red-500' : 'text-white'}">${state.currentUser || 'Unknown'} (ONLINE)</span><span class="text-[10px] text-zinc-600 font-bold">${state.isMC ? 'ADMIN' : 'PASSENGER'}</span></div>`;
+        }
+
+        function sendMsg() {
+            const input = document.getElementById('chat-input');
+            if(!input || !input.value.trim()) return;
+            state.messages.push({ sender: state.currentUser, text: input.value });
+            input.value = '';
+            render();
+        }
+
+        function openMCMenu(type) {
+            const modal = document.getElementById('mc-modal'); const content = document.getElementById('mc-modal-content'); modal.classList.remove('hidden'); content.innerHTML = '';
+            if(type === 'notice') content.innerHTML = `<div class="glass-card p-6 space-y-4 border-red-900"><input id="nc-title" placeholder="제목" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"><textarea id="nc-content" rows="3" placeholder="내용" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"></textarea><button onclick="postNotice()" class="w-full py-4 bg-red-600 text-white rounded-xl font-bold">공지 발신</button></div><div class="glass-card p-6 space-y-4 border-blue-900"><input id="ev-title" placeholder="이벤트 제목" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"><input id="ev-reward" placeholder="보상" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"><button onclick="postEvent()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold">돌발 이벤트 발생</button></div>`;
+            else if(type === 'mission') content.innerHTML = `<div class="glass-card p-6 space-y-4 border-zinc-700"><input id="ms-title" placeholder="미션 제목" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"><input id="ms-reward" placeholder="보상" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm"><button onclick="createMission()" class="w-full py-4 bg-white text-black rounded-xl font-bold">미션 게시</button></div>`;
+            lucide.createIcons();
+        }
+        function closeMCMenu() { document.getElementById('mc-modal').classList.add('hidden'); }
+        function postNotice() { const t = document.getElementById('nc-title').value; const c = document.getElementById('nc-content').value; state.messages.push({ sender: "MC-SYSTEM", type: 'notice', text: `[공지] ${t}\n\n${c}` }); closeMCMenu(); render(); }
+        function postEvent() { const t = document.getElementById('ev-title').value; const r = document.getElementById('ev-reward').value; state.events.push({ title: t, content: "돌발 상황이 발생했습니다!", firstReward: r }); state.messages.push({ sender: "MC-SYSTEM", type: 'notice', text: `[돌발 상황]\n${t}` }); closeMCMenu(); render(); }
+        function createMission() { const t = document.getElementById('ms-title').value; const r = document.getElementById('ms-reward').value; state.activeMissions.push({ title: t, content: "상세 내용은 MC에게 문의하세요.", reward: r }); state.messages.push({ sender: "MC-SYSTEM", type: 'notice', text: `[미션 게시]\n${t}` }); closeMCMenu(); render(); }
+
+        window.onload = () => { render(); lucide.createIcons(); };
+    </script>
+</body>
+</html>
